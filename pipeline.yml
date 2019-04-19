@@ -6,7 +6,7 @@ resource_types:
     tag: latest-final
 
 resources:
-- name: autoscaler-cli
+- name: autoscaler
   type: pivnet
   source:
     api_token: ((pivnet_token))
@@ -16,26 +16,32 @@ resources:
 jobs:
 - name: upload-plugin
   plan:
-  - get: autoscaler-cli
+  - get: autoscaler
     trigger: true
     params:
       globs: ["autoscaler-for-pcf*"]
   - task: upload
     config:
       inputs:
-        - name: autoscaler-cli
+      - name: autoscaler
       platform: linux
+      params:
+        username: ((username))
+        password: ((password))
+        maven_url: ((maven_url))
       image_resource:
         type: docker-image
-        source: {repository: busybox}
+        source: {repository: brianbyers/ubuntu-curl}
       run:
-        path: export
+        path: bash
         args:
-        - -v
-        - -u
-        - ((user-pass))
-        - --upload-file
-        
-
-
-#curl -v -u admin:admin123 --upload-file pom.xml http://localhost:8081/repository/maven-releases/org/foo/1.0/foo-1.0.pom
+        - "-c"
+        - |
+          set -eux
+          cd autoscaler
+          files=`find . -name "autoscaler-for-pcf*"`
+          for f in $files
+          do
+            filename=$(basename $f)
+            curl -v -u $username:$password --upload-file $filename $maven_url/$filename
+          done
